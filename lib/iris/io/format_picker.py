@@ -25,7 +25,7 @@ To manage a collection of FormatSpecifications for loading::
     import matplotlib.pyplot as plt
     fagent = fp.FormatAgent()
     png_spec = fp.FormatSpecification('PNG image', fp.MagicNumber(8),
-                                      0x89504E470D0A1A0A, 
+                                      0x89504E470D0A1A0A,
                                       handler=lambda filename: plt.imread(filename),
                                       priority=5
                                       )
@@ -119,7 +119,7 @@ class FormatAgent(object):
                 if buffer_obj is not None and buffer_obj.tell() != 0:
                     # reset the buffer if tell != 0
                     buffer_obj.seek(0)
- 
+
                 element_cache[repr(fmt_elem)] = \
                     fmt_elem.get_element(basename, buffer_obj)
 
@@ -295,3 +295,46 @@ class UriProtocol(FileElement):
     def get_element(self, basename, file_handle):
         return iris.io.decode_uri(basename)[0]
 
+
+class LeadingLineBin(FileElement):
+    """
+    A :class:`FileElement` that returns the first 'line' from the
+    binary file (Big Endian).
+    """
+    def get_element(self, basename, file_handle):
+        return _readline_bin(file_handle, '>')
+
+
+class LeadingLineBinLE(FileElement):
+    """
+    A :class:`FileElement` that returns the first 'line' from the
+    binary file (Little Endian).
+    """
+    def get_element(self, basename, file_handle):
+        return _readline_bin(file_handle, '<')
+
+
+def _readline_bin(fh, endian):
+    """
+    Reads and decodes a header "string line" encoded in a binary file
+    (designed for BPCH format).
+    """
+    fmt = endian + 'i'
+
+    # Read the line: prefix, header, and suffix
+    prefix = fh.read(struct.calcsize(fmt))
+    if prefix:
+        datasize = struct.unpack(fmt, prefix)[0]
+    else:
+        raise EOFError
+
+    header = fh.read(datasize)
+
+    suffix = fh.read(struct.calcsize(fmt))
+
+    if prefix != suffix:
+        # Pre- and suffix of line do not match. This can happen,
+        # if the endian is incorrect.
+        pass
+
+    return header

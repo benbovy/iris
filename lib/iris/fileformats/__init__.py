@@ -29,6 +29,7 @@ import name
 import netcdf
 import nimrod
 import pp
+import bpch
 
 
 __all__ = ['FORMAT_AGENT']
@@ -177,3 +178,23 @@ FORMAT_AGENT.add_spec(FormatSpecification('ABF', FileExtension(), '.abf',
 
 FORMAT_AGENT.add_spec(FormatSpecification('ABL', FileExtension(), '.abl',
                                           abf.load_cubes, priority=3))
+
+
+#
+# BPCH files.
+#
+FORMAT_AGENT.add_spec(FormatSpecification(
+    'Binary Punch File (BPCH) v2',
+    LeadingLineBin,
+    lambda line: line.lstrip().startswith("CTM bin 02"),
+                                          bpch.load_cubes,
+                                          priority=5)
+)
+
+FORMAT_AGENT.add_spec(FormatSpecification(
+    'Binary Punch File (BPCH) v2 little-endian',
+    LeadingLineBinLE,
+    lambda line: line.lstrip().startswith("CTM bin 02"),
+                                          bpch.load_cubes_le,
+                                          priority=3)
+)
