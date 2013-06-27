@@ -20,7 +20,6 @@ import warnings
 
 import numpy as np
 import netcdftime
-from pygchem import grid
 
 import iris
 import iris.fileformats.manager
@@ -67,40 +66,44 @@ def time(cube, field):
     cube.add_aux_coord(time_coord)
 
 
-def add_coords(cube, field):
+def add_coords(cube, field, ctm_grid_coords):
     """Add horizontal/vertical coordinates to the cube, from the CTM grid"""
     
-    ctm_grid = grid.CTMGrid.from_model(field.modelname)
-    lon, lat = ctm_grid.lonlat_centers
-    
-    x_coord = DimCoord(lon, standard_name="longitude", units="degrees")
-    y_coord = DimCoord(lat, standard_name="latitude", units="degrees")
+    x_coord = DimCoord(ctm_grid_coords['lon'], standard_name="grid_longitude",
+                       units="degrees")
+    y_coord = DimCoord(ctm_grid_coords['lat'], standard_name="grid_latitude",
+                       units="degrees")
     
     cube.add_dim_coord(x_coord, 0)
     cube.add_dim_coord(y_coord, 1)
     
-    # add vertical coordinates only for 3D fields with the same layers than
-    # the CTM grid
-    if len(field.shape) > 2 and field.shape[2] == ctm_grid.Nlayers:
-        press_coord = DimCoord(ctm_grid.pressure_centers,
-                               standard_name="air_pressure", units="hPa")
-        alt_coord = DimCoord(ctm_grid.altitude_centers * 1000.0,
-                             standard_name="altitude", units="m")
-        if ctm_grid.hybrid:
-            eta_coord = DimCoord(ctm_grid.eta_centers,
-                          standard_name="atmosphere_hybrid_height_coordinate",
-                          units="1")
-            sigma_coord = None
-        else:
-            eta_coord = None
-            sigma_coord = DimCoord(ctm_grid.sigma_centers,
-                                   standard_name="atmosphere_sigma_coordinate",
-                                   units="1")
+    # add vertical coordinates only for 3D fields
+    if len(field.shape) > 2:
+        layers_coord = DimCoord(np.arange(1, field.shape[2] + 1),
+                                    standard_name="model_level_number",
+                                    units="1")
+        cube.add_dim_coord(layers_coord, 2)
         
-        cube.add_dim_coord(press_coord, 2)
-        for c in (alt_coord, eta_coord, sigma_coord):
-            if c is not None:
-                cube.add_aux_coord(c, 2)
+        if field.shape[2] == ctm_grid_coords['Nlayers']:
+            press_coord = DimCoord(ctm_grid_coords['pressure'],
+                                   standard_name="air_pressure", units="hPa")
+            alt_coord = DimCoord(ctm_grid_coords['altitude'] * 1000.0,
+                                 standard_name="altitude", units="m")
+            if ctm_grid_coords['hybrid']:
+                eta_coord = DimCoord(ctm_grid_coords['eta'],
+                        standard_name="atmosphere_hybrid_height_coordinate",
+                        units="1")
+                sigma_coord = None
+            else:
+                eta_coord = None
+                sigma_coord = DimCoord(ctm_grid_coords['sigma'],
+                                standard_name="atmosphere_sigma_coordinate",
+                                units="1")
+            
+            
+            for c in (press_coord, alt_coord, eta_coord, sigma_coord):
+                if c is not None:
+                    cube.add_aux_coord(c, 2)
 
 
 def attributes(cube, field):
@@ -112,6 +115,7 @@ def attributes(cube, field):
             value = getattr(field, name)
             cube.attributes[name] = value
 
+    add_attr("name")
     add_attr("full_name")
     add_attr("index")
     add_attr("number")
@@ -124,7 +128,7 @@ def attributes(cube, field):
     add_attr("scale")
 
 
-def run(field):
+def run(field, ctm_grid_coords):
     """
     Convert a BPCH field to an Iris cube.
 
@@ -154,7 +158,7 @@ def run(field):
     name(cube, field)
     units(cube, field)
     time(cube, field)
-    add_coords(cube, field)
+    add_coords(cube, field, ctm_grid_coords)
     attributes(cube, field)
 
     return cube

@@ -264,6 +264,7 @@ def load_cubes(filenames, callback=None, endian='>'):
     # Lazy import to avoid importing pygchem until
     # attempting to load a BPCH file (pygchem.grid module needed).
     import iris.fileformats.bpch_load_rules
+    from pygchem import grid
     
     if isinstance(filenames, basestring):
         filenames = [filenames]
@@ -285,12 +286,30 @@ def load_cubes(filenames, callback=None, endian='>'):
                 filetype = ctm_file.readline().strip()
                 fsize = os.path.getsize(filename)
                 filetitle = ctm_file.readline().strip()
+                ctm_grid_coords = dict()
                 
                 while ctm_file.tell() < fsize:
                     
                     field = BPCHField(ctm_file, diagnostics)
                     
-                    cube = iris.fileformats.bpch_load_rules.run(field)
+                    # calculate grid coordinates once per file (assume all
+                    # fields in the file use the same grid, except vertical). 
+                    if not len(ctm_grid_coords.keys()):
+                        
+                        ctm_grid = grid.CTMGrid.from_model(field.modelname)
+                        
+                        lon, lat = ctm_grid.lonlat_centers
+                        ctm_grid_coords['lon'] = lon
+                        ctm_grid_coords['lat'] = lat
+                        ctm_grid_coords['eta'] = ctm_grid.eta_centers
+                        ctm_grid_coords['sigma'] = ctm_grid.sigma_centers
+                        ctm_grid_coords['pressure'] = ctm_grid.pressure_centers
+                        ctm_grid_coords['altitude'] = ctm_grid.altitude_centers
+                        ctm_grid_coords['hybrid'] = ctm_grid.hybrid
+                        ctm_grid_coords['Nlayers'] = ctm_grid.Nlayers
+                    
+                    cube = iris.fileformats.bpch_load_rules.run(field,
+                                                                ctm_grid_coords)
 
                     # Were we given a callback?
                     if callback is not None:
