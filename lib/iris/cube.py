@@ -42,9 +42,10 @@ import iris._concatenate
 import iris._constraints
 import iris._merge
 import iris.exceptions
+import iris.fileformats.rules
 import iris.util
 
-from iris._cube_coord_common import CFVariableMixin
+from iris._cube_coord_common import CFVariableMixin, LimitedAttributeDict
 
 
 __all__ = ['Cube', 'CubeList', 'CubeMetadata']
@@ -55,6 +56,7 @@ class CubeMetadata(collections.namedtuple('CubeMetadata',
                                            'long_name',
                                            'var_name',
                                            'units',
+                                           'cf_attributes',
                                            'attributes',
                                            'cell_methods'])):
     """
@@ -479,7 +481,7 @@ bound=(1994-12-01 00:00:00, 1998-12-01 00:00:00)
 
     """
     def __init__(self, data, standard_name=None, long_name=None,
-                 var_name=None, units=None, attributes=None,
+                 var_name=None, units=None, cf_attributes=None, attributes=None,
                  cell_methods=None, dim_coords_and_dims=None,
                  aux_coords_and_dims=None, aux_factories=None,
                  data_manager=None):
@@ -513,8 +515,13 @@ bound=(1994-12-01 00:00:00, 1998-12-01 00:00:00)
             The CF variable name for the cube.
         * units
             The unit of the cube, e.g. ``"m s-1"`` or ``"kelvin"``.
+        * cf_attributes
+            A dictionary of cube CF attributes, i.e., attributes that are
+            defined in the CF convention (e.g., scalar_factor, add_offset,
+            climatology...) with some exceptions (e.g., standard_name,
+            long_name, var_name, units, history...).  
         * attributes
-            A dictionary of cube attributes
+            A dictionary of other, non CF, cube attributes
         * cell_methods
             A tuple of CellMethod objects, generally set by Iris, e.g.
             ``(CellMethod("mean", coords='latitude'), )``.
@@ -572,7 +579,19 @@ bound=(1994-12-01 00:00:00, 1998-12-01 00:00:00)
         self.var_name = var_name
 
         self.cell_methods = cell_methods
-
+        
+        #: A dictionary for CF attributes other than the ones already defined here
+        self.cf_attributes = dict()
+        
+        for key in LimitedAttributeDict._forbidden_keys:
+            self.cf_attributes[key] = None        # add all CF attributes =
+                                                  # None as default
+        if cf_attributes is not None:
+            for key in cf_attributes.keys():
+                if key not in LimitedAttributeDict._forbidden_keys:
+                    raise KeyError("%s is not a valid CF attribute" % key)
+            self.cf_attributes.update(cf_attributes)
+            
         #: A dictionary, with a few restricted keys, for arbitrary
         #: Cube metadata.
         self.attributes = attributes
@@ -1331,6 +1350,13 @@ bound=(1994-12-01 00:00:00, 1998-12-01 00:00:00)
                         "to load the data.")
 
             self._data_manager = None
+        
+            # unpack if "unpacking" cf attributes are defined
+            if self.cf_attributes['scale_factor'] is not None:
+                self._data *= self.cf_attributes['scale_factor']
+            if self.cf_attributes['add_offset'] is not None:
+                self._data += self.cf_attributes['add_offset']
+        
         return self._data
 
     @data.setter
@@ -1673,6 +1699,23 @@ bound=(1994-12-01 00:00:00, 1998-12-01 00:00:00)
                 summary += '\n     Invalid coordinates:\n' + \
                     '\n'.join(invalid_summary)
 
+            #
+            # Generate summary of cube CF attributes.
+            #
+            if self.attributes:
+                attribute_lines = []
+                for name, value in sorted(self.cf_attributes.iteritems()):
+                    if value is None:
+                        continue
+                    value = unicode(value)
+                    value = iris.util.clip_string(value)
+                    line = u'{pad:{width}}{name}: {value}'.format(pad=' ',
+                                                                  width=indent,
+                                                                  name=name,
+                                                                  value=value)
+                    attribute_lines.append(line)
+                summary += '\n     CF Attributes:\n' + '\n'.join(attribute_lines)
+            
             #
             # Generate summary of cube attributes.
             #

@@ -69,10 +69,10 @@ def time(cube, field):
 def add_coords(cube, field, ctm_grid_coords):
     """Add horizontal/vertical coordinates to the cube, from the CTM grid"""
     
-    x_coord = DimCoord(ctm_grid_coords['lon'], standard_name="grid_longitude",
-                       units="degrees")
-    y_coord = DimCoord(ctm_grid_coords['lat'], standard_name="grid_latitude",
-                       units="degrees")
+    x_coord = DimCoord(ctm_grid_coords['lon'], standard_name="longitude",
+                       units="degrees_east")
+    y_coord = DimCoord(ctm_grid_coords['lat'], standard_name="latitude",
+                       units="degrees_north")
     
     cube.add_dim_coord(x_coord, 0)
     cube.add_dim_coord(y_coord, 1)
@@ -105,6 +105,17 @@ def add_coords(cube, field, ctm_grid_coords):
                 if c is not None:
                     cube.add_aux_coord(c, 2)
 
+def cf_attributes(cube, field):
+    """Add CF attributes to the cube."""
+    
+    def add_cf_attr(name, cf_name):
+        """Add a CF attribute to the cube."""
+        if hasattr(field, name):
+            value = getattr(field, name)
+            cube.cf_attributes[cf_name] = value
+    
+    add_cf_attr("scale", "scale_factor")
+    
 
 def attributes(cube, field):
     """Add attributes to the cube."""
@@ -125,7 +136,6 @@ def attributes(cube, field):
     add_attr("molecular_weight")
     add_attr("carbon_weight")
     add_attr("hydrocarbon")
-    add_attr("scale")
 
 
 def run(field, ctm_grid_coords):
@@ -159,6 +169,7 @@ def run(field, ctm_grid_coords):
     units(cube, field)
     time(cube, field)
     add_coords(cube, field, ctm_grid_coords)
+    cf_attributes(cube, field)
     attributes(cube, field)
 
     return cube
