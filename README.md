@@ -16,7 +16,7 @@ This is a fork of the Iris project, which allow loading data from BPCH files
 
 An additional Python package is required :
 
-- PyGChem (<https://github.com/benbovy/iris>)
+- PyGChem (<https://github.com/benbovy/pygchem>)
   
 
 Installation
