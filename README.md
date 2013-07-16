@@ -8,6 +8,16 @@ Iris
 Iris is a powerful, easy to use, community-driven Python library for
 analysing and visualising meteorological and oceanographic data sets.
 
+Note
+----
+
+This is a fork of the Iris project, which allow loading data from BPCH files
+(Binary format related to GEOS-Chem: a 3D atmospheric chemistry model).
+
+An additional Python package is required :
+
+- PyGChem (<https://github.com/benbovy/iris>)
+  
 
 Installation
 ------------
