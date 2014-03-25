@@ -301,9 +301,6 @@ class LeadingLineBin(FileElement):
     A :class:`FileElement` that returns the first 'line' from the
     binary file (Big Endian).
     """
-    def __init__(self):
-        FileElement.__init__(self, requires_fh=True)
-
     def get_element(self, basename, file_handle):
         return _readline_bin(file_handle, '>')
 
@@ -313,9 +310,6 @@ class LeadingLineBinLE(FileElement):
     A :class:`FileElement` that returns the first 'line' from the
     binary file (Little Endian).
     """
-    def __init__(self):
-        FileElement.__init__(self, requires_fh=True)
-
     def get_element(self, basename, file_handle):
         return _readline_bin(file_handle, '<')
 
