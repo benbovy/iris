@@ -186,7 +186,7 @@ FORMAT_AGENT.add_spec(FormatSpecification('ABL', FileExtension(), '.abl',
 #
 FORMAT_AGENT.add_spec(FormatSpecification(
     'Binary Punch File (BPCH) v2',
-    LeadingLineBin,
+    LeadingLineBin(),
     lambda line: line.lstrip().startswith("CTM bin 02"),
                                           bpch.load_cubes,
                                           priority=5)
@@ -194,7 +194,7 @@ FORMAT_AGENT.add_spec(FormatSpecification(
 
 FORMAT_AGENT.add_spec(FormatSpecification(
     'Binary Punch File (BPCH) v2 little-endian',
-    LeadingLineBinLE,
+    LeadingLineBinLE(),
     lambda line: line.lstrip().startswith("CTM bin 02"),
                                           bpch.load_cubes_le,
                                           priority=3)
