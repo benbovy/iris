@@ -17,12 +17,14 @@
 """Rules for converting BPCH fields into cubes."""
 
 import warnings
+import string
 
 import numpy as np
 import netcdftime
 
 import iris
-import iris.fileformats.manager
+import iris.unit as iunits
+import iris.fileformats.manager as iffmanager
 from iris.coords import DimCoord
 from iris.exceptions import TranslationError
 
@@ -30,8 +32,14 @@ from iris.exceptions import TranslationError
 __all__ = ['run']
 
 # time encoding for bpch files
-TIME_UNIT = iris.unit.Unit('hours since 1985-01-01 00:00:00',
-                           calendar=iris.unit.CALENDAR_STANDARD)
+TIME_UNIT = iunits.Unit('hours since 1985-01-01 00:00:00',
+                        calendar=iunits.CALENDAR_STANDARD)
+
+# unit names geos-chem -> udunits2
+UNITS_GC2UD = {'unitless': '1',
+               'v/v': '1',
+               'level': '1'} 
+
 
 def name(cube, field):
     """Set the cube's name from the field."""
@@ -41,16 +49,21 @@ def name(cube, field):
 def units(cube, field):
     """
     Set the cube's units from the field.
-    Unhandled units are stored in an "invalid_units" attribute instead.
+    Unhandled units (not supported by udunits2) are stored in an "no_ud_units"
+    attribute instead.
     """
     units = field.unit.strip()
     try:
         cube.units = units
     except ValueError:
-        # Just add it as an attribute.
+        # Just add it as an attribute, change the units name if needed.
+        if "molec" in units:
+            cube.units = string.replace(units, 'molec', 'count')
+        if units in UNITS_GC2UD.keys():
+            cube.units = UNITS_GC2UD[units]
         warnings.warn("Unhandled units '{0}' recorded in cube attributes.".
                       format(units))
-        cube.attributes["invalid_units"] = units
+        cube.attributes["no_udunits2"] = units
 
 
 def time(cube, field):
@@ -74,36 +87,43 @@ def add_coords(cube, field, ctm_grid_coords):
     y_coord = DimCoord(ctm_grid_coords['lat'], standard_name="latitude",
                        units="degrees_north")
     
-    cube.add_dim_coord(x_coord, 0)
-    cube.add_dim_coord(y_coord, 1)
+    try:
+        cube.add_dim_coord(x_coord, 0)
+        cube.add_dim_coord(y_coord, 1)
+    except ValueError:
+        warnings.warn("Cube's horizontal grid doesn't correspond to "
+                      "the CTM horizontal grid. Coordinates not specified.")
     
     # add vertical coordinates only for 3D fields
-    if len(field.shape) > 2:
+    if len(field.shape) > 2 and field.shape[2] == ctm_grid_coords['Nlayers']:
         layers_coord = DimCoord(np.arange(1, field.shape[2] + 1),
-                                    standard_name="model_level_number",
-                                    units="1")
-        cube.add_dim_coord(layers_coord, 2)
-        
-        if field.shape[2] == ctm_grid_coords['Nlayers']:
-            press_coord = DimCoord(ctm_grid_coords['pressure'],
-                                   standard_name="air_pressure", units="hPa")
-            alt_coord = DimCoord(ctm_grid_coords['altitude'] * 1000.0,
-                                 standard_name="altitude", units="m")
-            if ctm_grid_coords['hybrid']:
-                eta_coord = DimCoord(ctm_grid_coords['eta'],
-                        standard_name="atmosphere_hybrid_height_coordinate",
-                        units="1")
-                sigma_coord = None
-            else:
-                eta_coord = None
-                sigma_coord = DimCoord(ctm_grid_coords['sigma'],
-                                standard_name="atmosphere_sigma_coordinate",
+                                standard_name="model_level_number",
                                 units="1")
-            
-            
-            for c in (press_coord, alt_coord, eta_coord, sigma_coord):
-                if c is not None:
-                    cube.add_aux_coord(c, 2)
+        cube.add_dim_coord(layers_coord, 2)
+
+        press_coord = DimCoord(ctm_grid_coords['pressure'],
+                               standard_name="air_pressure", units="hPa")
+        alt_coord = DimCoord(ctm_grid_coords['altitude'] * 1000.0,
+                             standard_name="altitude", units="m")
+        if ctm_grid_coords['hybrid']:
+            eta_coord = DimCoord(ctm_grid_coords['eta'],
+                    standard_name="atmosphere_hybrid_height_coordinate",
+                    units="1")
+            sigma_coord = None
+        else:
+            eta_coord = None
+            sigma_coord = DimCoord(ctm_grid_coords['sigma'],
+                            standard_name="atmosphere_sigma_coordinate",
+                            units="1")
+
+        for c in (press_coord, alt_coord, eta_coord, sigma_coord):
+            if c is not None:
+                cube.add_aux_coord(c, 2)
+
+    else:
+        warnings.warn("Cube's vertical grid doesn't correspond to the CTM "
+                      "vertical grid. Coordinates not specified.")
+
 
 def cf_attributes(cube, field):
     """Add CF attributes to the cube."""
@@ -159,9 +179,9 @@ def run(field, ctm_grid_coords):
     
     # Create cube with data (not yet deferred)
     data_proxy = np.array(field.data_proxy)
-    data_manager = iris.fileformats.manager.DataManager(field.shape,
-                                                        dummy_data.dtype,
-                                                        None)
+    data_manager = iffmanager.DataManager(field.shape,
+                                          dummy_data.dtype,
+                                          None)
     
     cube = iris.cube.Cube(data_proxy, data_manager=data_manager)
     

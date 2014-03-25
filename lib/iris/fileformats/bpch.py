@@ -205,6 +205,7 @@ class BPCHField():
         self.origin = (dim3, dim4, dim5)
         self.resolution = (res0, res1)
         self.shape = (dim0, dim1, dim2)
+        self.name = ""       # defined later from self.diagnostic
         
         self.unit = unit.strip()
         
