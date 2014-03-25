@@ -37,6 +37,9 @@ lib/iris/tests/result_image_comparison/
 .pydevproject
 .settings
 
+# PyCharm
+.idea
+
 # Auto generated documentation files
 docs/iris/src/_static/random_image.js
 docs/iris/src/_templates/gallery.html
