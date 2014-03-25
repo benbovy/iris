@@ -16,6 +16,7 @@
 # along with Iris.  If not, see <http://www.gnu.org/licenses/>.
 """Rules for converting BPCH fields into cubes."""
 
+
 import warnings
 import string
 
@@ -24,7 +25,7 @@ import netcdftime
 
 import iris
 import iris.unit as iunits
-import iris.fileformats.manager as iffmanager
+from iris.fileformats.manager import DataManager
 from iris.coords import DimCoord
 from iris.exceptions import TranslationError
 
@@ -179,9 +180,9 @@ def run(field, ctm_grid_coords):
     
     # Create cube with data (not yet deferred)
     data_proxy = np.array(field.data_proxy)
-    data_manager = iffmanager.DataManager(field.shape,
-                                          dummy_data.dtype,
-                                          None)
+    data_manager = DataManager(field.shape,
+                               dummy_data.dtype,
+                               None)
     
     cube = iris.cube.Cube(data_proxy, data_manager=data_manager)
     
